@@ -1,0 +1,23 @@
+{
+	"uid":"announcements-pencilblue",
+	"name":"Announcements",
+	"description":"PencilBlue plugin to add an announcements list to site",
+	"version":"0.1.0",
+	"pb_version":"0.4.x",
+	"author": {
+		"name":"Thomas H. Case",
+		"email":"thomas@thcase.com",
+		"website":"http://thcase.com",
+		"contributors":[]
+	},
+	"settings": [],
+	"permissions": {
+		"ACCESS_USER": [],
+		"ACCESS_WRITER": [],
+		"ACCESS_EDITOR": [],
+		"ACCESS_MANAGING_EDITOR":[]
+	},
+	"main_module": {
+		"path":"announcements.js"
+	}
+}
