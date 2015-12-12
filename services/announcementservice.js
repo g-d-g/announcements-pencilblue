@@ -4,14 +4,13 @@
  * @author Thomas H Case
  * @license This code is licensed under MIT license (see the LICENSE file for details)
  */
+var async = require('async');
+
 module.exports = function(pb){
     
-    //Node dependencies
-    var async = require('async');
-
 	//pb dependencies
-    var BaseObjectService = pb.BaseObjectService;
     var util    = pb.util;
+    var cos 	= new pb.CustomObjectService();
 	
 	/**
      * AnnouncementService 
@@ -19,46 +18,8 @@ module.exports = function(pb){
      * @class BSCarouselService
      * @constructor
      */
-	function AnnouncementService(context) {
-        if(!util.isObject(context)) {
-            context = {};
-        }
-        context.type = TYPE;
-        AnnouncementService.super_.call(this,context);
-        
-        /**
-         * @property userService
-         * @type {UserService}
-         */
-        this.userService = new pb.UserService(context);
-        
-        /**
-         * @property customObjectService
-         * @type {CustomObjectService}
-         */
-        this.cos = new pb.CustomObjectService(); 
-        
-        // Check whether localization Service present
-        if(!util.isObject(context.ls)) {
-            throw new Error('The context.ls (Location Service object) is missing');
-        }
-        /**
-         * @property ls 
-         * @type {LocalizationService}
-         */
-        this.ls = context.ls;
-        
-        if(!!util.isObject(context.ts)) {
-            throw new Error('The context.ls (Location Service object) is missing');
-        }
-        /**
-         * @property ts Template Service
-         * @type {TemplateService}
-         */
-        this.ts = context.ts;
-	};
-    util.inherits(AnnouncementService,BaseObjectService);
-	
+	function AnnouncementService() {};
+    
 	/**
      * The name of the Custom Object Type
      * @private
@@ -67,7 +28,7 @@ module.exports = function(pb){
      * @property TYPE
      * @type {String}
      */
-    var CUSTOM_OBJ_TYPENAME = 'announcements';
+    var CUSTOM_OBJ_TYPENAME = 'Announcements';
     
     /**
      * The name the service
@@ -86,7 +47,7 @@ module.exports = function(pb){
      * @property TYPE
      * @type {String}
      */
-    var TYPE = 'announcement';
+    var TYPE = 'Announcements';
     
     /**
 	 * Init function required by PencilBlue
@@ -130,7 +91,7 @@ module.exports = function(pb){
                cb(err,null);
            } 
            pb.log.debug('Querying for Announcement items with options [%s] and object type [%s]',JSON.stringify(options),JSON.stringify(objType));
-           self.cos.findByType(objType,options,function(err,result){
+           cos.findByType(objType,options,function(err,result){
                if(util.isError(err)){
                    pb.log.debug('Error when querying for announcement items');
                    cb(err,null);
@@ -139,72 +100,100 @@ module.exports = function(pb){
                cb(null,result);
            })
         });
-    }
+    };
     
     /**
-     *  Retrieves Array of Current Announcement Items
-     *      Items with publish date <= current date
-     *      and publish end date >= current date
-     *      Sorted either ascending or descending by Publish Date
-     *  @method getCurrentItems
-     *  @returns array of current announcement item documents
-     *  @param sortOrder Order to sort results (0 = Ascending, 1 = Descending)
+     * Retrieves Individual Announcement Item By Id
+     * @method getItemById
+     * @param id Id of Announcement
+     * @param {function}cb Call Back function to return Announcement
      */
-    AnnouncementService.getCurrentItems = function(order,cb) {
+    AnnouncementService.getItemById = function(id,cb) {
         var self = this;
-        var err = null;
-        if(typeof order != 'number') {
-            pb.log.debug('AnnouncementService.getCurrentItems: order passed not a number, value was [%s]',JSON.stringify(order));
-            err = new Error('order must be a number');
-            cb(err,null);
-        }else if (order != 0 || order != 1){
-            pb.log.debug('AnnouncementService.getCurrentItems: order passed not a number, value was [%s]',order);
-            err = new Error('order must be either 0 or 1');
-            cb(err,null);
-        }
-        var options = {order:{publish_date:order}};
-        self.getItems(options,function(err,result){
+        var options = {};
+        cos.loadById(id,options,function(err,announcement){
+           if(util.isError(err)){
+               cb(err,null);
+           } 
+           cb(null,announcement);
+        });
+    };
+    
+    /**
+     * Returns formatted Item using HTML Template
+     * @method renderAnnouncement
+     * @returns formatted Item using HTML Template
+     * @param {object}item individual announcement item
+     * @param {bool}limitContent whether to limit content length to 255 characters
+     * @param {object}context Curent PencilBlue Context
+     * @param {object}ls Current PencilBlue Location Service
+     * @param {function}cb callback function to return result
+     */
+    AnnouncementService.renderAnnouncement = function(item,limitContent,context,ls,cb) {
+        var userService = new pb.UserService(context);
+        var authorId = item.author;
+        userService.getFullName(authorId,function(err,authorFullName){
             if(util.isError(err)){
                 cb(err,null);
-            };
-            cb(null,result);
+            }
+            var ats = new pb.TemplateService(ls);
+            ats.registerLocal('Announcement_Id',item._id)
+            ats.registerLocal('Announcement_Name',item.name);
+            ats.registerLocal('Announcement_Author',authorFullName);
+            var datePublished = new Date(item.published);
+            ats.registerLocal('Announcement_Published',datePublished.toLocaleString());
+            
+            if(limitContent && item.content.length > 255) {
+                var lastSpaceBeforeBreak = item.content.lastIndexOf(' ',251);
+                var limitedContent = item.content.substring(0,lastSpaceBeforeBreak) + ' ...';
+                ats.registerLocal('Announcement_Content',new pb.TemplateValue(limitedContent,false));
+            } else {
+                ats.registerLocal('Announcement_Content',new pb.TemplateValue(item.content,false));
+            }
+            ats.load('announcement_item',function(err,template){
+                if(util.isError(err)) {
+                    cb(err,'');
+                } else {
+                    cb(null,template);
+                }
+            });
         });
-    }
+    };
     
     /**
-     * Returns items formatted as HTML for Template Value
-     * @method getItemsAsTemplateValue
-     * @returns string HTML formatted list of items for using with templates
-     * @param items array of announcement items to render
-     * @param cb {function} Callback function to pass back results and/or error {err,result}
+     * Returns formatted list of Announcements using HTML Template
+     * @method renderAnnouncements
+     * @param items Array of Announcement items
+     * @param {bool} limitContent Flag on whether to limit annoucement content
+     * @param {object} context Current PencilBlue context
+     * @param {object} ls Current PencilBlue Localization Service
+     * @param {Function} cb Callback function (err,result)
      */
-    AnnouncementService.formatItemsAsHTML = function(items,cb) {
+    AnnouncementService.renderAnnouncements = function(items,limitContent,context,ls,cb) {
         var self = this;
-        var tasks = util.getTasks(items,function(item,i){
-            return function(callback){
-                self.UserService.getFullName(item.author,function(err,author){
-                    if(util.isError(err)){
-                        callback(err,null);
-                    }
-                    var ats = new pb.TemplateService(self.ls);
-                    ats.registerLocal('Announcement_Name',item.name);
-                    ats.registerLocal('Announcement_Author',author);
-                    ats.registerLocal('Announcement_Published',item.publish_date);
-                    ats.registerLocal('Announcement_Content',item.content);
-                    ats.load('announcement_item',function(err,template){
-                       if(util.isError(err)) {
-                           callback(err,'');
-                       } else {
-                           callback(null,template);
-                       }
-                    });
-                });
-            }
+        var ats = new pb.TemplateService(ls);
+        ats.registerLocal('Announcements',function(flag,cb){
+           if(util.isArray(items) && items.length > 0){
+               var tasks = util.getTasks(items,function(items,i){
+                  return function(callback) {
+                      self.renderAnnouncement(items[i],limitContent,context,ls,callback);
+                  } 
+               });
+               async.parallel(tasks,function(err,result){
+                  cb(err,new pb.TemplateValue(result.join(''),false)) 
+               });
+           } else {
+               cb(null,new pb.TemplateValue('No announcements found',false));
+           }
         });
-        async.parallel(tasks,function(err,results){
-           cb(err,new pb.TemplateValue(results.join(''),false)); 
+        ats.load('announcement_list',function(err,template){
+           if(util.isError(err)) {
+               cb(err,'');
+           } else {
+               cb(null,template);
+           }
         });
-    }
+    };
     
     /**
      * Retrieves actual Object Type from CustomObjectService
@@ -212,14 +201,14 @@ module.exports = function(pb){
      * @param {function} cb
      */
     AnnouncementService.getType = function(cb) {
-      this.cos.loadTypeByName(CUSTOM_OBJ_TYPENAME,function(err,customObject){
+      cos.loadTypeByName(CUSTOM_OBJ_TYPENAME,function(err,customObject){
 	      if(err){
 		      cb(err,null);
 	      }
 	      pb.log.debug('Found Custom Object: %s',JSON.stringify(customObject));
 	      cb(null,customObject);
       });
-    }
+    };
     
     //exports
     return AnnouncementService;

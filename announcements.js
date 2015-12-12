@@ -19,9 +19,9 @@ module.exports = function AnnouncementsModule(pb){
      * @private
      * @static
      * @readonly
-     * @property ANNOUNCEMENTS_OBJ_TYPENAME
+     * @property CUSTOM_OBJ_TYPENAME
      */
-    var ANNOUNCEMENTS_OBJ_TYPENAME = 'Announcements';
+    var CUSTOM_OBJ_TYPENAME = 'Announcements';
 
     /**
      *@private
@@ -59,9 +59,7 @@ module.exports = function AnnouncementsModule(pb){
      * @readonly
      * @property FIELD_TYPE_PEER_OBJECT
      */
-    var FIELD_TYPE_PEER_OBJECT = Object.freeze({
-        field_type: 'peer_object'
-    });
+    var FIELD_TYPE_PEER_OBJECT =  'peer_object';
     
 	/**
 	 * Called when the application is being installed for the first time.
@@ -73,23 +71,22 @@ module.exports = function AnnouncementsModule(pb){
 		var cos = new pb.CustomObjectService();
 		//Load Type
         pb.log.debug('Attempting to load Announcements Custom Object');
-		cos.loadTypeByName(ANNOUNCEMENTS_OBJ_TYPENAME,function(err,announcementType){
+		cos.loadTypeByName(CUSTOM_OBJ_TYPENAME,function(err,announcementType){
             pb.log.debug('Announcement Custom Object is: %s',JSON.stringify(announcementType));
             if(util.isError(err) || announcementType){
 				return cb(err,!util.isError(err));
 			}
 			//Define Custom Object
 			var announcementValues = {
-				name: ANNOUNCEMENTS_OBJ_TYPENAME,
+				name: CUSTOM_OBJ_TYPENAME,
 				fields: {
-					name: FIELD_TYPE_TEXT,
-                    author: {
+					author: {
                         field_type: FIELD_TYPE_PEER_OBJECT,
                         object_type: "user"
                     },
                     content: FIELD_TYPE_WYSIWYG,
-                    publish_date: FIELD_TYPE_DATE,
-					publish_end_date: FIELD_TYPE_DATE,
+                    published: FIELD_TYPE_DATE,
+					expires: FIELD_TYPE_DATE,
 					tags: FIELD_TYPE_TEXT
 				}
 			};
