@@ -2,7 +2,7 @@
 	"uid":"announcements-pencilblue",
 	"name":"Announcements",
 	"description":"PencilBlue plugin to add an announcements list to site",
-	"version":"0.1.1",
+	"version":"0.2.0",
 	"pb_version":"0.5.x",
 	"author": {
 		"name":"Thomas H. Case",
